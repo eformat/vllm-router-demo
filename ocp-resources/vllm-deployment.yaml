@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: vllm
+  name: vllm
+  namespace: noconnor-test
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      app: vllm
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: vllm
+    spec:
+      affinity: {}
+      containers:
+      - args:
+        - --model
+        - microsoft/phi-2
+        - --download-dir
+        - /models-cache
+        - --dtype
+        - float16
+        - --max-lora-rank
+        - "64"
+        - --enable-lora
+        - --lora-modules
+        - dcot=/models-cache/lora/phi-2-dcot/
+        - doctor=/models-cache/lora/phi2-doctor28e/
+        - --chat-template
+        - /models-cache/prompt/chat.jinja
+        - --uvicorn-log-level
+        - debug
+        env:
+        - name: HUGGING_FACE_HUB_TOKEN
+          valueFrom:
+            secretKeyRef:
+              key: HUGGING_FACE_HUB_TOKEN
+              name: vllm-secrets
+        - name: HF_HUB_OFFLINE
+          value: "0"
+        - name: VLLM_LOGGING_LEVEL
+          value: DEBUG
+        image: quay.io/modh/vllm:rhoai-2.13
+        imagePullPolicy: IfNotPresent
+        livenessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          periodSeconds: 100
+          successThreshold: 1
+          timeoutSeconds: 8
+        name: server
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        readinessProbe:
+          failureThreshold: 3
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 5
+        resources:
+          limits:
+            cpu: "8"
+            memory: 24Gi
+            nvidia.com/gpu: "1"
+          requests:
+            cpu: "6"
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          runAsNonRoot: true
+          seccompProfile:
+            type: RuntimeDefault
+        startupProbe:
+          failureThreshold: 24
+          httpGet:
+            path: /health
+            port: http
+            scheme: HTTP
+          periodSeconds: 30
+          successThreshold: 1
+          timeoutSeconds: 1
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /models-cache
+          name: models-cache
+        - mountPath: /dev/shm
+          name: shm
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 120
+      tolerations:
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - name: models-cache
+        persistentVolumeClaim:
+          claimName: vllm-models-cache
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
+        name: shm
