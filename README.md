@@ -1,9 +1,11 @@
 # LLM Dynamic Model Demo
 
+* A POC to prove that semantic routing and LORA adapters can work together.
+* Each request is semantically evaluated against pre-configured examples and forwarded onto the correct adapter.
+* Requests which fail the evaluation e.g. the router doesn't know where to route them is forwarded onto the default (Phi2) base model.
 
-## UI(openwebui.com) -> LiteLLM + Semantic Router -> vLLM with LORA adapters
 
-
+**UI(openwebui.com) -> LiteLLM + Semantic Router -> vLLM with LORA adapters**
 
 ### Deploying and Configuring vLLM 
 ```
