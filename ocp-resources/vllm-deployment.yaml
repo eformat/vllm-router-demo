@@ -4,7 +4,7 @@ metadata:
   labels:
     app: vllm
   name: vllm
-  namespace: noconnor-test
+  namespace: lora
 spec:
   progressDeadlineSeconds: 600
   replicas: 1
@@ -22,23 +22,23 @@ spec:
     spec:
       affinity: {}
       containers:
-      - args:
-        - --model
-        - microsoft/phi-2
-        - --download-dir
-        - /models-cache
-        - --dtype
-        - float16
-        - --max-lora-rank
-        - "64"
-        - --enable-lora
-        - --lora-modules
-        - dcot=/models-cache/lora/phi-2-dcot/
-        - doctor=/models-cache/lora/phi2-doctor28e/
-        - --chat-template
-        - /models-cache/prompt/chat.jinja
-        - --uvicorn-log-level
-        - debug
+      - command:
+          - python
+          - -m
+          - vllm.entrypoints.openai.api_server
+          - --port=8080
+          - --model=/models-cache/models/granite-3.0-8b-instruct
+          - --served-model-name=granite-3.0-8b-instruct
+          - --max-model-len=4096
+          - --dtype=bfloat16
+          - --max-lora-rank=64
+          - --enable-lora
+          - --lora-modules
+          - english-quotes=/models-cache/models/english-quotes-ibm-granite-3.8b-instruct
+          - java-code=/models-cache/models/java-code-ibm-granite-3.8b-instruct
+          - emojis=/models-cache/models/emojis-ibm-granite-3.8b-instruct
+          - --chat-template=/models-cache/models/chat_template.jinja
+          - --uvicorn-log-level=debug
         env:
         - name: HUGGING_FACE_HUB_TOKEN
           valueFrom:
@@ -49,7 +49,13 @@ spec:
           value: "0"
         - name: VLLM_LOGGING_LEVEL
           value: DEBUG
-        image: quay.io/modh/vllm:rhoai-2.13
+        - name: HF_HOME
+          value: /models-cache
+        - name: NUMBA_CACHE_DIR
+          value: /tmp
+        - name: HOME
+          value: /models-cache
+        image: quay.io/modh/vllm:rhoai-2.16-cuda
         imagePullPolicy: IfNotPresent
         livenessProbe:
           failureThreshold: 3
@@ -62,7 +68,7 @@ spec:
           timeoutSeconds: 8
         name: server
         ports:
-        - containerPort: 8000
+        - containerPort: 8080
           name: http
           protocol: TCP
         readinessProbe:
